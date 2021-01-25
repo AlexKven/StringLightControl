@@ -31,6 +31,7 @@ size_t strlen(STR ifsh)
 
 #define ledCount 50
 CRGB leds[ledCount];
+CRGB background[ledCount];
 
 // read the buttons
 int read_LCD_buttons()
@@ -75,7 +76,7 @@ CRGB multColor(CRGB to, CRGB from, TLevel maxLevel, TLevel minLevel, TLevel leve
   return CRGB(r,g,b);
 }
 
-int brightness = 10;
+int brightness = 5;
 
 int speed = 0;
 int min_speed = -12;
@@ -182,6 +183,7 @@ struct optColor
 optColor* vals_color;
 int numVals_color;
 int curVal_color;
+int curVal_bgColor = 3;
 
 struct optPattern
 {
@@ -211,8 +213,9 @@ void decrement(int& val, int min, int max)
 int mode = 0;
 #define modeBRIGHTNESS 0
 #define modeCOLOR 1
-#define modePATTERN 2
-#define modeSPEED 3
+#define modeBGCOLOR 2
+#define modePATTERN 3
+#define modeSPEED 4
 
 void updateDisplay()
 {
@@ -226,7 +229,6 @@ void updateDisplay()
   lcd.setCursor(15,0);
   lcd.print(F(">"));
 
-      Serial.println(mode);
   switch (mode)
   {
     case modeBRIGHTNESS:
@@ -242,6 +244,16 @@ void updateDisplay()
       lcd.setCursor(5,0);
       lcd.print(F("Color"));
       STR colorName = vals_color[curVal_color].name;
+      int colorLen = strlen(colorName);
+      lcd.setCursor(8 - (colorLen + 1) / 2,1);
+      lcd.print(colorName);
+      break;
+    }
+    case modeBGCOLOR:
+    {
+      lcd.setCursor(1,0);
+      lcd.print(F("Backgrnd Color"));
+      STR colorName = vals_color[curVal_bgColor].name;
       int colorLen = strlen(colorName);
       lcd.setCursor(8 - (colorLen + 1) / 2,1);
       lcd.print(colorName);
@@ -273,6 +285,21 @@ void updateDisplay()
 CRGB color_white(int led)
 {
   return CRGB::White;
+}
+
+CRGB color_lightGrey(int led)
+{
+  return CRGB(128, 128, 128);
+}
+
+CRGB color_darkGrey(int led)
+{
+  return CRGB(48, 48, 48);
+}
+
+CRGB color_black(int led)
+{
+  return CRGB::Black;
 }
 
 CRGB color_red(int led)
@@ -330,106 +357,104 @@ CRGB color_seahawks(int led)
   return led % 2 == 0 ? CRGB(128, 255, 0) : CRGB(0, 64, 255);
 }
 
-void pattern_solid(double time, bool cycleStart, bool actionPressed)
+void pattern_solid(double time, bool cycleStart, bool reverse)
 {
-  if (actionPressed)
+  if (reverse)
   {
     for (int i = 0; i < ledCount; i++)
     {
-      leds[i] = CRGB::Black;
+      leds[i] = background[i];
     }
   }
   return;
 }
 
-void pattern_pulse(double time, bool cycleStart, bool actionPressed)
+void pattern_pulse(double time, bool cycleStart, bool reverse)
 {
-  if (actionPressed)
-    Serial.println(time);
   for (int i = 0; i < ledCount; i++)
   {
     CRGB color = leds[i];
-    if (actionPressed && i % 2 == 0)
+    CRGB bgColor = background[i];
+    if (reverse && i % 2 == 0)
     {
       if (time < 1)
       {
-        color = multColor<double>(color, CRGB::Black, 1, 0, 1 - time);
+        color = multColor<double>(color, bgColor, 1, 0, 1 - time);
       }
       else
       {
-        color = multColor<double>(color, CRGB::Black, 1, 0, time - 1);
+        color = multColor<double>(color, bgColor, 1, 0, time - 1);
       }
     }
     else
     {
       if (time < 1)
       {
-        color = multColor<double>(color, CRGB::Black, 1, 0, time);
+        color = multColor<double>(color, bgColor, 1, 0, time);
       }
       else
       {
-        color = multColor<double>(color, CRGB::Black, 1, 0, 2 - time);
+        color = multColor<double>(color, bgColor, 1, 0, 2 - time);
       }
     }
     leds[i] = color;
   }
 }
 
-void pattern_slide_base(double time, bool cycleStart, bool actionPressed, int slideLength, double transition)
+void pattern_slide_base(double time, bool cycleStart, bool reverse, int slideLength, double transition)
 {
   double ledTime = 5.0 / ledCount;
   double pos = time / ledTime;
   for (int i = 0; i < ledCount; i++)
   {
     CRGB color = leds[i];
+    CRGB bgColor = background[i];
     
-    double dist = actionPressed ?
+    double dist = reverse ?
       pos - (ledCount - i - 1) :
       pos - i;
     if (dist < 0)
       dist += ledCount;
-    if (i == 0)
-      Serial.println(pos);
 
     if (ledCount - dist < transition)
     {
-      color = multColor<double>(color, CRGB::Black, transition, 0, transition - (ledCount - dist));
+      color = multColor<double>(color, bgColor, transition, 0, transition - (ledCount - dist));
     }
     else
     {
-      color = multColor<double>(color, CRGB::Black, ledCount, ledCount - slideLength, ledCount - dist);
+      color = multColor<double>(color, bgColor, ledCount, ledCount - slideLength, ledCount - dist);
     }
     
     leds[i] = color;
   }
 }
 
-void pattern_slide_long(double time, bool cycleStart, bool actionPressed)
+void pattern_slide_long(double time, bool cycleStart, bool reverse)
 {
-  pattern_slide_base(time, cycleStart, actionPressed, 40, 2.5);
+  pattern_slide_base(time, cycleStart, reverse, 40, 2.5);
 }
 
-void pattern_slide_medium(double time, bool cycleStart, bool actionPressed)
+void pattern_slide_medium(double time, bool cycleStart, bool reverse)
 {
-  pattern_slide_base(time, cycleStart, actionPressed, 20, 2);
+  pattern_slide_base(time, cycleStart, reverse, 20, 2);
 }
 
-void pattern_slide_short(double time, bool cycleStart, bool actionPressed)
+void pattern_slide_short(double time, bool cycleStart, bool reverse)
 {
-  pattern_slide_base(time, cycleStart, actionPressed, 10, 1);
+  pattern_slide_base(time, cycleStart, reverse, 10, 1);
 }
 
-void pattern_scan(double time, bool cycleStart, bool actionPressed)
+void pattern_scan(double time, bool cycleStart, bool reverse)
 {
-  pattern_slide_base(time, cycleStart, actionPressed, ledCount / 2.0, ledCount / 2.0);
+  pattern_slide_base(time, cycleStart, reverse, ledCount / 2.0, ledCount / 2.0);
 }
 
-void pattern_binary(double time, bool cycleStart, bool actionPressed)
+void pattern_binary(double time, bool cycleStart, bool reverse)
 {
   static unsigned long long value = 0;
   if (cycleStart)
   {
-    if (actionPressed)
+    if (reverse)
       value -= 1;
     else
       value += 1;
@@ -438,7 +463,7 @@ void pattern_binary(double time, bool cycleStart, bool actionPressed)
   for (int i = 0; i < ledCount; i++)
   {
     if (shValue % 2 == 0)
-      leds[i] = CRGB::Black;
+      leds[i] = background[i];
     shValue = shValue >> 1;
   }
 }
@@ -446,60 +471,68 @@ void pattern_binary(double time, bool cycleStart, bool actionPressed)
 void setup()
 {
   lcd.begin(16, 2);
-  FastLED.addLeds<WS2812, 4>(leds, 50);
+  FastLED.addLeds<WS2812, 3>(leds, 50);
   randomSeed(analogRead(1));
   Serial.begin(9600);
 
-  numVals_color = 12;
+  numVals_color = 15;
+  int i = 0;
   vals_color = new optColor[numVals_color];
-  vals_color[0].name = F("White");
-  vals_color[0].func = color_white;
-  vals_color[1].name = F("Red");
-  vals_color[1].func = color_red;
-  vals_color[2].name = F("Green");
-  vals_color[2].func = color_green;
-  vals_color[3].name = F("Blue");
-  vals_color[3].func = color_blue;
-  vals_color[4].name = F("Yellow");
-  vals_color[4].func = color_yellow;
-  vals_color[5].name = F("Orange");
-  vals_color[5].func = color_orange;
-  vals_color[6].name = F("Sunrise");
-  vals_color[6].func = color_sunrise;
-  vals_color[7].name = F("Light Blue");
-  vals_color[7].func = color_lightBlue;
-  vals_color[8].name = F("Sky Blue");
-  vals_color[8].func = color_skyBlue;
-  vals_color[9].name = F("Cyan");
-  vals_color[9].func = color_cyan;
-  vals_color[10].name = F("Teal");
-  vals_color[10].func = color_teal;
-  vals_color[11].name = F("Seahawks");
-  vals_color[11].func = color_seahawks;
+  vals_color[i].name = F("White");
+  vals_color[i++].func = color_white;
+  vals_color[i].name = F("Light Grey");
+  vals_color[i++].func = color_lightGrey;
+  vals_color[i].name = F("Dark Grey");
+  vals_color[i++].func = color_darkGrey;
+  vals_color[i].name = F("Black");
+  vals_color[i++].func = color_black;
+  vals_color[i].name = F("Red");
+  vals_color[i++].func = color_red;
+  vals_color[i].name = F("Green");
+  vals_color[i++].func = color_green;
+  vals_color[i].name = F("Blue");
+  vals_color[i++].func = color_blue;
+  vals_color[i].name = F("Yellow");
+  vals_color[i++].func = color_yellow;
+  vals_color[i].name = F("Orange");
+  vals_color[i++].func = color_orange;
+  vals_color[i].name = F("Sunrise");
+  vals_color[i++].func = color_sunrise;
+  vals_color[i].name = F("Light Blue");
+  vals_color[i++].func = color_lightBlue;
+  vals_color[i].name = F("Sky Blue");
+  vals_color[i++].func = color_skyBlue;
+  vals_color[i].name = F("Cyan");
+  vals_color[i++].func = color_cyan;
+  vals_color[i].name = F("Teal");
+  vals_color[i++].func = color_teal;
+  vals_color[i].name = F("Seahawks");
+  vals_color[i++].func = color_seahawks;
 
   numVals_pattern = 7;
+  i = 0;
   vals_pattern = new optPattern[numVals_pattern];
-  vals_pattern[0].name = F("Solid");
-  vals_pattern[0].func = pattern_solid;
-  vals_pattern[0].time = 1;
-  vals_pattern[1].name = F("Pulse");
-  vals_pattern[1].func = pattern_pulse;
-  vals_pattern[1].time = 2;
-  vals_pattern[2].name = F("Slide Long");
-  vals_pattern[2].func = pattern_slide_long;
-  vals_pattern[2].time = 5;
-  vals_pattern[3].name = F("Slide Medium");
-  vals_pattern[3].func = pattern_slide_medium;
-  vals_pattern[3].time = 5;
-  vals_pattern[4].name = F("Slide Short");
-  vals_pattern[4].func = pattern_slide_short;
-  vals_pattern[4].time = 5;
-  vals_pattern[5].name = F("Scan");
-  vals_pattern[5].func = pattern_scan;
-  vals_pattern[5].time = 5;
-  vals_pattern[6].name = F("Binary");
-  vals_pattern[6].func = pattern_binary;
-  vals_pattern[6].time = 0.25;
+  vals_pattern[i].name = F("Solid");
+  vals_pattern[i].func = pattern_solid;
+  vals_pattern[i++].time = 1;
+  vals_pattern[i].name = F("Pulse");
+  vals_pattern[i].func = pattern_pulse;
+  vals_pattern[i++].time = 2;
+  vals_pattern[i].name = F("Slide Long");
+  vals_pattern[i].func = pattern_slide_long;
+  vals_pattern[i++].time = 5;
+  vals_pattern[i].name = F("Slide Medium");
+  vals_pattern[i].func = pattern_slide_medium;
+  vals_pattern[i++].time = 5;
+  vals_pattern[i].name = F("Slide Short");
+  vals_pattern[i].func = pattern_slide_short;
+  vals_pattern[i++].time = 5;
+  vals_pattern[i].name = F("Scan");
+  vals_pattern[i].func = pattern_scan;
+  vals_pattern[i++].time = 5;
+  vals_pattern[i].name = F("Binary");
+  vals_pattern[i].func = pattern_binary;
+  vals_pattern[i++].time = 0.25;
 
   strClear = F("                ");
   updateDisplay();
@@ -508,6 +541,7 @@ void setup()
 int lastButton = btnNONE;
 double curTime = 0;
 unsigned long lastTick = 0;
+bool reverse = false;
 void loop()
 {
   unsigned long curTick = micros();
@@ -521,13 +555,14 @@ void loop()
     curTime -= timeLength;
   }
   lastTick = curTick;
-  int curButton = read_LCD_buttons();
   for (int i = 0; i < ledCount; i++)
   {
     CRGB color = vals_color[curVal_color].func(i);
+    CRGB bgColor = vals_color[curVal_bgColor].func(i);
     leds[i] = color;
+    background[i] = bgColor;
   }
-  vals_pattern[curVal_pattern].func(curTime, cycleStart, curButton == btnSELECT);
+  vals_pattern[curVal_pattern].func(curTime, cycleStart, reverse);
   for (int i = 0; i < ledCount; i++)
   {
     CRGB color = leds[i];
@@ -537,19 +572,18 @@ void loop()
 
   FastLED.show();
 
+  int curButton = read_LCD_buttons();
   if (curButton != lastButton)
   {
-    Serial.println(speed_factor(speed));
-    Serial.println(curTime);
     if (lastButton == btnNONE)
     {
      switch (curButton)
      {
       case btnRIGHT:
-        increment(mode, 0, 3);
+        increment(mode, 0, 4);
         break;
       case btnLEFT:
-        decrement(mode, 0, 3);
+        decrement(mode, 0, 4);
         break;
       case btnUP:
         switch (mode)
@@ -559,6 +593,9 @@ void loop()
             break;
           case modeCOLOR:
             increment(curVal_color, 0, numVals_color - 1);
+            break;
+          case modeBGCOLOR:
+            increment(curVal_bgColor, 0, numVals_color - 1);
             break;
           case modePATTERN:
             curTime = 0;
@@ -578,6 +615,9 @@ void loop()
           case modeCOLOR:
             decrement(curVal_color, 0, numVals_color - 1);
             break;
+          case modeBGCOLOR:
+            decrement(curVal_bgColor, 0, numVals_color - 1);
+            break;
           case modePATTERN:
             curTime = 0;
             decrement(curVal_pattern, 0, numVals_pattern - 1);
@@ -586,6 +626,9 @@ void loop()
             decrement(speed, min_speed, max_speed);
             break;
         }
+        break;
+      case btnSELECT:
+        reverse = !reverse;
         break;
       }
       updateDisplay();
