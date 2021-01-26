@@ -600,13 +600,10 @@ void loop()
 
   if (info_power > power_cap)
   {
-    for (int i = 0; i < ledCount; i++)
-    {
-      leds[i] = multColor<int>(leds[i], CRGB::Black, info_power, 0, power_cap);
-    }
     actualPwr = 0;
     for (int i = 0; i < ledCount; i++)
     {
+      leds[i] = multColor<int>(leds[i], CRGB::Black, info_power, 0, power_cap);
       actualPwr += leds[i].r;
       actualPwr += leds[i].g;
       actualPwr += leds[i].b;
