@@ -76,6 +76,8 @@ CRGB multColor(CRGB to, CRGB from, TLevel maxLevel, TLevel minLevel, TLevel leve
   return CRGB(r,g,b);
 }
 
+int power_cap = 85;
+
 int brightness = 5;
 
 int speed = 0;
@@ -178,6 +180,19 @@ struct optColor
 {
   STR name;
   CRGB(*func)(int);
+
+  void set(CRGB(*_func)(int), STR _name)
+  {
+    name = _name;
+    func = _func;
+  }
+  
+  template<int R, int G, int B>
+  void constant(STR _name)
+  {
+    name = _name;
+    func = color_constant<R, G, B>;
+  }
 };
 
 optColor* vals_color;
@@ -216,6 +231,26 @@ int mode = 0;
 #define modeBGCOLOR 2
 #define modePATTERN 3
 #define modeSPEED 4
+#define modeINFO 5
+#define max_mode 5
+
+int curVal_info = 0;
+int max_info = 1;
+int info_fps = 0;
+int info_power = 0;
+
+int countDigits(int i)
+{
+  if (i < 0)
+    return 1 + countDigits(-i);
+  int result = 1;
+  while (i > 10)
+  {
+    i /= 10;
+    result++;
+  }
+  return result;
+}
 
 void updateDisplay()
 {
@@ -279,82 +314,54 @@ void updateDisplay()
       lcd.print(speedName);
       break;
     }
+    case modeINFO:
+    {
+      lcd.setCursor(2,0);
+      lcd.print(F("Information"));
+      STR postfix;
+      int num;
+      if (curVal_info == 0)
+      {
+        postfix = F(" FPS");
+        num = info_fps;
+      }
+      else
+      {
+        postfix = F("% Power");
+        num = info_power;
+      }
+      int numLen = countDigits(num);
+      int postfixLen = strlen(postfix);
+      int start = 8 - (numLen + postfixLen + 1) / 2;
+      lcd.setCursor(start, 1);
+      lcd.print(num);
+      start += numLen;
+      lcd.setCursor(start, 1);
+      lcd.print(postfix);
+      break;
+    }
   }
 }
 
-CRGB color_white(int led)
+template<int R, int G, int B>
+CRGB color_constant(int led)
 {
-  return CRGB::White;
-}
-
-CRGB color_lightGrey(int led)
-{
-  return CRGB(128, 128, 128);
-}
-
-CRGB color_darkGrey(int led)
-{
-  return CRGB(48, 48, 48);
-}
-
-CRGB color_black(int led)
-{
-  return CRGB::Black;
-}
-
-CRGB color_red(int led)
-{
-  return CRGB::Red;
-}
-
-CRGB color_green(int led)
-{
-  return CRGB::Green;
-}
-
-CRGB color_blue(int led)
-{
-  return CRGB::Blue;
-}
-
-CRGB color_yellow(int led)
-{
-  return CRGB(255, 255, 0);
-}
-
-CRGB color_orange(int led)
-{
-  return CRGB(255, 128, 0);
-}
-
-CRGB color_sunrise(int led)
-{
-  return CRGB(255, 192, 0);
-}
-
-CRGB color_lightBlue(int led)
-{
-  return CRGB(0, 192, 255);
-}
-
-CRGB color_skyBlue(int led)
-{
-  return CRGB(0, 255, 255);
-}
-
-CRGB color_cyan(int led)
-{
-  return CRGB(0, 255, 192);
-}
-
-CRGB color_teal(int led)
-{
-  return CRGB(0, 255, 128);
+  return CRGB(R, G, B);
 }
 
 CRGB color_seahawks(int led)
 {
   return led % 2 == 0 ? CRGB(128, 255, 0) : CRGB(0, 64, 255);
+}
+
+CRGB color_christmas(int led)
+{
+  return led % 2 == 0 ? CRGB(48, 255, 0) : CRGB(255, 0, 0);
+}
+
+CRGB color_police(int led)
+{
+  return (led / 4) % 2 == 0 ? CRGB(255, 0, 0) : CRGB(0, 0, 255);
 }
 
 void pattern_solid(double time, bool cycleStart, bool reverse)
@@ -475,39 +482,49 @@ void setup()
   randomSeed(analogRead(1));
   Serial.begin(9600);
 
-  numVals_color = 15;
+  numVals_color = 40;
   int i = 0;
   vals_color = new optColor[numVals_color];
-  vals_color[i].name = F("White");
-  vals_color[i++].func = color_white;
-  vals_color[i].name = F("Light Grey");
-  vals_color[i++].func = color_lightGrey;
-  vals_color[i].name = F("Dark Grey");
-  vals_color[i++].func = color_darkGrey;
-  vals_color[i].name = F("Black");
-  vals_color[i++].func = color_black;
-  vals_color[i].name = F("Red");
-  vals_color[i++].func = color_red;
-  vals_color[i].name = F("Green");
-  vals_color[i++].func = color_green;
-  vals_color[i].name = F("Blue");
-  vals_color[i++].func = color_blue;
-  vals_color[i].name = F("Yellow");
-  vals_color[i++].func = color_yellow;
-  vals_color[i].name = F("Orange");
-  vals_color[i++].func = color_orange;
-  vals_color[i].name = F("Sunrise");
-  vals_color[i++].func = color_sunrise;
-  vals_color[i].name = F("Light Blue");
-  vals_color[i++].func = color_lightBlue;
-  vals_color[i].name = F("Sky Blue");
-  vals_color[i++].func = color_skyBlue;
-  vals_color[i].name = F("Cyan");
-  vals_color[i++].func = color_cyan;
-  vals_color[i].name = F("Teal");
-  vals_color[i++].func = color_teal;
-  vals_color[i].name = F("Seahawks");
-  vals_color[i++].func = color_seahawks;
+  vals_color[i++].constant<255, 255, 255>(F("White"));
+  vals_color[i++].constant<128, 128, 128>(F("Light Grey"));
+  vals_color[i++].constant<48, 48, 48>(F("Dark Grey"));
+  vals_color[i++].constant<0, 0, 0>(F("Black"));
+  vals_color[i++].constant<255, 0, 0>(F("Red"));
+  vals_color[i++].constant<96, 0, 0>(F("Dark Red"));
+  vals_color[i++].constant<255, 48, 48>(F("Pink"));
+  vals_color[i++].constant<0, 255, 0>(F("Green"));
+  vals_color[i++].constant<0, 96, 0>(F("Dark Green"));
+  vals_color[i++].constant<128, 255, 32>(F("Light Green"));
+  vals_color[i++].constant<0, 0, 255>(F("Blue"));
+  vals_color[i++].constant<0, 0, 96>(F("Dark Blue"));
+  vals_color[i++].constant<96, 96, 255>(F("Light Blue"));
+  vals_color[i++].constant<255, 255, 0>(F("Yellow"));
+  vals_color[i++].constant<128, 128, 0>(F("Dark Yellow"));
+  vals_color[i++].constant<255, 255, 32>(F("Light Yellow"));
+  vals_color[i++].constant<255, 128, 0>(F("Orange"));
+  vals_color[i++].constant<96, 48, 0>(F("Dark Orange"));
+  vals_color[i++].constant<255, 160, 48>(F("Light Orange"));
+  vals_color[i++].constant<255, 64, 0>(F("Sunset"));
+  vals_color[i++].constant<160, 255, 0>(F("Yellow Green"));
+  vals_color[i++].constant<60, 96, 0>(F("Drk Yellow Green"));
+  vals_color[i++].constant<224, 0, 255>(F("Magenta"));
+  vals_color[i++].constant<84, 0, 96>(F("Dark Magenta"));
+  vals_color[i++].constant<255, 96, 255>(F("Violet"));
+  vals_color[i++].constant<128, 0, 255>(F("Purple"));
+  vals_color[i++].constant<48, 0, 96>(F("Dark Purple"));
+  vals_color[i++].constant<160, 32, 255>(F("Light Purple"));
+  vals_color[i++].constant<0, 255, 192>(F("Cyan"));
+  vals_color[i++].constant<0, 96, 96>(F("Dark Cyan"));
+  vals_color[i++].constant<48, 255, 255>(F("Light Cyan"));
+  vals_color[i++].constant<0, 255, 192>(F("Sky Blue"));
+  vals_color[i++].constant<0, 96, 72>(F("Dark Sky Blue"));
+  vals_color[i++].constant<32, 255, 224>(F("Light Sky Blue"));
+  vals_color[i++].constant<0, 255, 96>(F("Teal"));
+  vals_color[i++].constant<0, 96, 36>(F("Dark Teal"));
+  vals_color[i++].constant<32, 255, 96>(F("Light Teal"));
+  vals_color[i++].set(color_seahawks, F("Seahawks"));
+  vals_color[i++].set(color_christmas, F("Christmas"));
+  vals_color[i++].set(color_police, F("Police"));
 
   numVals_pattern = 7;
   i = 0;
@@ -541,6 +558,8 @@ void setup()
 int lastButton = btnNONE;
 double curTime = 0;
 unsigned long lastTick = 0;
+unsigned long lastInfo = 0;
+unsigned int frameCount = 0;
 bool reverse = false;
 void loop()
 {
@@ -563,14 +582,51 @@ void loop()
     background[i] = bgColor;
   }
   vals_pattern[curVal_pattern].func(curTime, cycleStart, reverse);
+  
+  unsigned long totalPwr = 765;
+  totalPwr *= ledCount;
+  unsigned long actualPwr = 0;
   for (int i = 0; i < ledCount; i++)
   {
     CRGB color = leds[i];
     color = multColor<int>(color, CRGB::Black, 10, 0, brightness);
     leds[i] = color;
+    actualPwr += leds[i].r;
+    actualPwr += leds[i].g;
+    actualPwr += leds[i].b;
+  }
+  actualPwr *= 100;
+  info_power = (int)(actualPwr / totalPwr);
+
+  if (info_power > power_cap)
+  {
+    for (int i = 0; i < ledCount; i++)
+    {
+      leds[i] = multColor<int>(leds[i], CRGB::Black, info_power, 0, power_cap);
+    }
+    actualPwr = 0;
+    for (int i = 0; i < ledCount; i++)
+    {
+      actualPwr += leds[i].r;
+      actualPwr += leds[i].g;
+      actualPwr += leds[i].b;
+    }
+    actualPwr *= 100;
+    info_power = (int)(actualPwr / totalPwr);
   }
 
   FastLED.show();
+
+  diff = curTick - lastInfo;
+  if (diff > 1000000)
+  {
+    info_fps = (int)(1000000 * (double)frameCount / (double)diff);
+    frameCount = 0;
+    lastInfo = curTick;
+    if (mode == modeINFO)
+      updateDisplay();
+  }
+  frameCount++;
 
   int curButton = read_LCD_buttons();
   if (curButton != lastButton)
@@ -580,10 +636,10 @@ void loop()
      switch (curButton)
      {
       case btnRIGHT:
-        increment(mode, 0, 4);
+        increment(mode, 0, max_mode);
         break;
       case btnLEFT:
-        decrement(mode, 0, 4);
+        decrement(mode, 0, max_mode);
         break;
       case btnUP:
         switch (mode)
@@ -603,6 +659,9 @@ void loop()
             break;
           case modeSPEED:
             increment(speed, min_speed, max_speed);
+            break;
+          case modeINFO:
+            increment(curVal_info, 0, max_info);
             break;
         }
         break;
@@ -624,6 +683,9 @@ void loop()
             break;
           case modeSPEED:
             decrement(speed, min_speed, max_speed);
+            break;
+          case modeINFO:
+            decrement(curVal_info, 0, max_info);
             break;
         }
         break;
