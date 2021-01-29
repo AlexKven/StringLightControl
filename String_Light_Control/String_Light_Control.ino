@@ -76,7 +76,7 @@ CRGB multColor(CRGB to, CRGB from, TLevel maxLevel, TLevel minLevel, TLevel leve
   return CRGB(r,g,b);
 }
 
-int power_cap = 85;
+int power_cap = 100;
 
 int brightness = 5;
 
@@ -244,7 +244,7 @@ int countDigits(int i)
   if (i < 0)
     return 1 + countDigits(-i);
   int result = 1;
-  while (i > 10)
+  while (i >= 10)
   {
     i /= 10;
     result++;
@@ -478,7 +478,7 @@ void pattern_binary(double time, bool cycleStart, bool reverse)
 void setup()
 {
   lcd.begin(16, 2);
-  FastLED.addLeds<WS2812, 3>(leds, 50);
+  FastLED.addLeds<WS2812, 3>(leds, ledCount);
   randomSeed(analogRead(1));
   Serial.begin(9600);
 
