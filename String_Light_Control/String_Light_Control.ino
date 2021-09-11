@@ -1,6 +1,8 @@
 //Sample using LiquidCrystal library
+#include <EEPROM.h>
 #include <LiquidCrystal.h>
 #include "FastLED.h"
+
  
 // select the pins used on the LCD panel
 LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
@@ -301,12 +303,16 @@ int mode = 0;
 #define modePATTERN 3
 #define modeSPEED 4
 #define modeINFO 5
-#define max_mode 5
+#define modePRESET 6
+#define max_mode 6
 
 int curVal_info = 0;
 int max_info = 1;
 int info_fps = 0;
 int info_power = 0;
+
+int curVal_preset = 0;
+int max_preset = 60;
 
 int countDigits(int i)
 {
@@ -407,6 +413,14 @@ void updateDisplay()
       start += numLen;
       lcd.setCursor(start, 1);
       lcd.print(postfix);
+      break;
+    }
+    case modePRESET:
+    {
+      lcd.setCursor(5,0);
+      lcd.print(F("Preset"));
+      lcd.setCursor(7,1);
+      lcd.print(curVal_preset);
       break;
     }
   }
@@ -609,6 +623,109 @@ void shuffle(bool init = false)
   }
 }
 
+unsigned int eeprom_length;
+unsigned int eeprom_region_start = 0;
+
+void writeResilient(int index, uint8_t value)
+{
+  int eepromInd = index * 3;
+  EEPROM.update(eepromInd, value);
+  EEPROM.update(eepromInd + 1, value);
+  EEPROM.update(eepromInd + 2, value);
+
+  Serial.println(eepromInd);
+}
+
+uint8_t readResilient(int index, uint8_t def = 0)
+{
+  int eepromInd = index * 3;
+  uint8_t val1 = EEPROM.read(eepromInd);
+  uint8_t val2 = EEPROM.read(eepromInd + 1);
+  uint8_t val3 = EEPROM.read(eepromInd + 2);
+
+  if (val1 == val2)
+    return val1;
+  if (val1 == val3)
+    return val1;
+  if (val2 == val3)
+    return val2;
+  return def;
+}
+
+void loadSettings(bool loadPreset = true)
+{
+  if (loadPreset)
+  {
+    curVal_preset = readResilient(0, 0);
+    if (curVal_preset > max_preset)
+      curVal_preset = max_preset;
+  }
+
+  int startInd = curVal_preset * 5 + 1;
+  brightness = readResilient(startInd, 1);
+  if (brightness > 10)
+    brightness = 10;
+  brightnessFloat = (float)brightness / 10.0f;
+  
+  curVal_color = readResilient(startInd + 1);
+  if (curVal_color >= numVals_color)
+    curVal_color = numVals_color - 1;
+  
+  curVal_bgColor = readResilient(startInd + 2, 3);
+  if (curVal_bgColor >= numVals_color)
+    curVal_bgColor = numVals_color - 1;
+  
+  curVal_pattern = readResilient(startInd + 3);
+  if (curVal_pattern >= numVals_pattern)
+    curVal_pattern = numVals_pattern - 1;
+  
+  speed = (int)readResilient(startInd + 4, 12) + min_speed;
+  if (speed > max_speed)
+    speed = max_speed;
+}
+
+void saveSettings()
+{
+  writeResilient(0, curVal_preset);
+  
+  int startInd = curVal_preset * 5 + 1;
+  writeResilient(startInd, brightness);
+  writeResilient(startInd + 1, curVal_color);
+  writeResilient(startInd + 2, curVal_bgColor);
+  writeResilient(startInd + 3, curVal_pattern);
+  writeResilient(startInd + 4, (uint8_t)(speed - min_speed));
+}
+
+void initEeprom()
+{
+  eeprom_length = EEPROM.length();
+  Serial.println(eeprom_length);
+  loadSettings();
+
+  if (brightness < 2)
+    brightness = 0;
+  else
+    brightness -= 2;
+  brightnessFloat = (float)brightness / 10.0f;
+    
+  writeResilient(curVal_preset * 5 + 1, brightness);
+}
+
+void clearEeprom()
+{
+  writeResilient(0, 0);
+  for (int i = 0; i <= max_preset; i++)
+  {
+    int startInd = i * 5 + 1;
+    writeResilient(startInd, 5);
+    writeResilient(startInd + 1, 0);
+    writeResilient(startInd + 2, 3);
+    writeResilient(startInd + 3, 0);
+    writeResilient(startInd + 4, 12);
+  }
+  loadSettings();
+}
+
 void setup()
 {
   lcd.begin(16, 2);
@@ -690,9 +807,13 @@ void setup()
   vals_pattern[i++].time = 0.25;
 
   strClear = F("                ");
-  updateDisplay();
 
   shuffle(true);
+
+  initEeprom();
+  Serial.println(6);
+  
+  updateDisplay();
 }
 
 int lastButton = btnNONE;
@@ -701,6 +822,8 @@ unsigned long lastTick = 0;
 unsigned long lastInfo = 0;
 unsigned int frameCount = 0;
 bool reverse = false;
+unsigned long holdStart = 0;
+unsigned long saveStart = 0;
 void loop()
 {
   unsigned long curTick = micros();
@@ -757,10 +880,13 @@ void loop()
   frameCount++;
 
   int curButton = read_LCD_buttons();
+    
   if (curButton != lastButton)
   {
     if (lastButton == btnNONE)
     {
+     holdStart = millis();
+      
      switch (curButton)
      {
       case btnRIGHT:
@@ -774,22 +900,32 @@ void loop()
         {
           case modeBRIGHTNESS:
             increment(brightness, 0, 10);
+            saveStart = millis();
             break;
           case modeCOLOR:
             increment(curVal_color, 0, numVals_color - 1);
+            saveStart = millis();
             break;
           case modeBGCOLOR:
             increment(curVal_bgColor, 0, numVals_color - 1);
+            saveStart = millis();
             break;
           case modePATTERN:
             curTime = 0;
             increment(curVal_pattern, 0, numVals_pattern - 1);
+            saveStart = millis();
             break;
           case modeSPEED:
             increment(speed, min_speed, max_speed);
+            saveStart = millis();
             break;
           case modeINFO:
             increment(curVal_info, 0, max_info);
+            break;
+          case modePRESET:
+            increment(curVal_preset, 0, max_preset);
+            saveStart = millis();
+            loadSettings(false);
             break;
         }
         break;
@@ -798,22 +934,33 @@ void loop()
         {
           case modeBRIGHTNESS:
             decrement(brightness, 0, 10);
+            saveStart = millis();
             break;
           case modeCOLOR:
             decrement(curVal_color, 0, numVals_color - 1);
+            saveStart = millis();
             break;
           case modeBGCOLOR:
             decrement(curVal_bgColor, 0, numVals_color - 1);
+            saveStart = millis();
             break;
           case modePATTERN:
             curTime = 0;
             decrement(curVal_pattern, 0, numVals_pattern - 1);
+            saveStart = millis();
             break;
           case modeSPEED:
             decrement(speed, min_speed, max_speed);
+            saveStart = millis();
             break;
           case modeINFO:
             decrement(curVal_info, 0, max_info);
+            saveStart = millis();
+            break;
+          case modePRESET:
+            decrement(curVal_preset, 0, max_preset);
+            saveStart = millis();
+            loadSettings(false);
             break;
         }
         break;
@@ -824,6 +971,26 @@ void loop()
       brightnessFloat = (float)brightness / 10.0f;
       updateDisplay();
     }
+    else
+    {
+      holdStart = 0;
+    }
     lastButton = curButton;
+  }
+  else if (holdStart != 0)
+  {
+    if (curButton == btnSELECT && millis() - holdStart > 10000)
+    {
+      clearEeprom();
+      mode = 0;
+      reverse = false;
+      updateDisplay();
+    }
+  }
+
+  if (saveStart != 0 && millis() - saveStart > 5000)
+  {
+      saveSettings();
+      saveStart = 0;
   }
 }
