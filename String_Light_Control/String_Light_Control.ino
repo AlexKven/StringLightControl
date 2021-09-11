@@ -433,6 +433,24 @@ CRGB color_police(int led)
   return (led / 4) % 2 == 0 ? CRGB(255, 0, 0) : CRGB(0, 0, 255);
 }
 
+int convertColorComponent(int val)
+{
+  int result = (val + 1) * 32;
+  if (result > 0)
+    result--;
+  return result;
+}
+
+CRGB color_random(int led)
+{
+  float factor = 512.0 / ledCountFloat;
+  int clr = (int)((float)(roundingOrder[led] + 1) * factor) - 1;
+  int r = convertColorComponent(clr / 64);
+  int g = convertColorComponent((clr / 8) % 8);
+  int b = convertColorComponent(clr % 8);
+  return CRGB(r, g, b);
+}
+
 float roundNumberForLed(int led)
 {
   int order = roundingOrder[led];
@@ -598,7 +616,7 @@ void setup()
   randomSeed(analogRead(1));
   Serial.begin(9600);
 
-  numVals_color = 43;
+  numVals_color = 44;
   int i = 0;
   vals_color = new optColor[numVals_color];
   vals_color[i++].constant<255, 255, 255>(F("White"));
@@ -644,6 +662,7 @@ void setup()
   vals_color[i++].set(color_seahawks, F("Seahawks"));
   vals_color[i++].set(color_christmas, F("Christmas"));
   vals_color[i++].set(color_police, F("Police"));
+  vals_color[i++].set(color_random, F("Random"));
 
   numVals_pattern = 7;
   i = 0;
