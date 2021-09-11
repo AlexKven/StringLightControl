@@ -29,9 +29,11 @@ size_t strlen(STR ifsh)
   return n;
 }
 
-#define ledCount 50
+#define ledCount 100
+float ledCountFloat = (float)ledCount;
 CRGB leds[ledCount];
 CRGB background[ledCount];
+uint8_t roundingOrder[ledCount];
 
 // read the buttons
 int read_LCD_buttons()
@@ -48,37 +50,104 @@ int read_LCD_buttons()
  return btnNONE;  // when all others fail, return this...
 }
 
-template<typename TVal, typename TLevel>
-TVal mult(TVal maxVal, TVal minVal, TLevel maxLevel, TLevel minLevel, TLevel level)
+float mult(float maxVal, float minVal, float maxLevel, float minLevel, float level)
 {
   if (level <= minLevel)
     return minVal;
   if (level >= maxLevel)
     return maxVal;
-  double valVariance = (double)maxVal - (double)minVal;
-  double levelVariance = (double)maxLevel - (double)minLevel;
-  double frac = ((double)level - (double)minLevel) / levelVariance;
-  return (TVal)((double)minVal + frac * valVariance);
+  float valVariance = maxVal - minVal;
+  float levelVariance = maxLevel - minLevel;
+  float frac = (level - minLevel) / levelVariance;
+  float result = minVal + frac * valVariance;
+  
+  return result;
 }
 
-template<typename TLevel>
-CRGB multColor(CRGB to, CRGB from, TLevel maxLevel, TLevel minLevel, TLevel level)
+float roundByNumber(float number, float roundNumber)
+{
+  float rounded = (float)((int)number);
+  float frac = number - rounded;
+  if (frac > roundNumber)
+    rounded += 1.0f;
+  return rounded;
+}
+
+CRGB multColor(CRGB to, CRGB from, float maxLevel, float minLevel, float level, float bright = 1.0f, float roundNumber = 1.0f)
 {
   if (level <= minLevel)
     return from;
   if (level >= maxLevel)
     return to;
 
-  int r = mult<int, TLevel>(to.r, from.r, maxLevel, minLevel, level);
-  int g = mult<int, TLevel>(to.g, from.g, maxLevel, minLevel, level);
-  int b = mult<int, TLevel>(to.b, from.b, maxLevel, minLevel, level);
+  float rFloat = mult(to.r, from.r, maxLevel, minLevel, level) * bright;
+  float gFloat = mult(to.g, from.g, maxLevel, minLevel, level) * bright;
+  float bFloat = mult(to.b, from.b, maxLevel, minLevel, level) * bright;
 
+  if (roundNumber < 1.0)
+  {
+    rFloat = roundByNumber(rFloat, roundNumber);
+    gFloat = roundByNumber(gFloat, roundNumber);
+    bFloat = roundByNumber(bFloat, roundNumber);
+  }
+
+  int r = (int)(rFloat);
+  int g = (int)(gFloat);
+  int b = (int)(bFloat);
+
+  if (roundNumber < 1.0)
+  {
+    if (r > 255)
+      r = 255;
+    if (g > 255)
+      g = 255;
+    if (b > 255)
+      b = 255;
+  }
+  
   return CRGB(r,g,b);
+}
+
+
+CRGB colorBright(CRGB color, float bright, float roundNumber = 1.0f)
+{
+  float rFloat = (float)color.r * bright;
+  float gFloat = (float)color.g * bright;
+  float bFloat = (float)color.b * bright;
+
+  if (roundNumber < 1.0)
+  {
+    rFloat = roundByNumber(rFloat, roundNumber);
+    gFloat = roundByNumber(gFloat, roundNumber);
+    bFloat = roundByNumber(bFloat, roundNumber);
+  }
+
+  int r = (int)(rFloat);
+  int g = (int)(gFloat);
+  int b = (int)(bFloat);
+
+  if (roundNumber < 1.0)
+  {
+    if (r > 255)
+      r = 255;
+    if (g > 255)
+      g = 255;
+    if (b > 255)
+      b = 255;
+  }
+  
+  return CRGB(r,g,b);
+}
+
+int colorPower(CRGB color)
+{
+  return color.r + color.g + color.b;
 }
 
 int power_cap = 100;
 
 int brightness = 5;
+float brightnessFloat = 0.5f;
 
 int speed = 0;
 int min_speed = -12;
@@ -141,7 +210,7 @@ STR speed_name(int speed)
   }
 }
 
-double speed_factor(int speed)
+float speed_factor(int speed)
 {
   if (speed < 0)
     return 1 / speed_factor(-speed);
@@ -203,8 +272,8 @@ int curVal_bgColor = 3;
 struct optPattern
 {
   STR name;
-  void(*func)(double, bool, bool);
-  double time;
+  unsigned long(*func)(float, bool, bool);
+  float time;
 };
 
 optPattern* vals_pattern;
@@ -364,60 +433,78 @@ CRGB color_police(int led)
   return (led / 4) % 2 == 0 ? CRGB(255, 0, 0) : CRGB(0, 0, 255);
 }
 
-void pattern_solid(double time, bool cycleStart, bool reverse)
+float roundNumberForLed(int led)
 {
-  if (reverse)
-  {
-    for (int i = 0; i < ledCount; i++)
-    {
-      leds[i] = background[i];
-    }
-  }
-  return;
+  int order = roundingOrder[led];
+  return (float)order / ledCountFloat;
 }
 
-void pattern_pulse(double time, bool cycleStart, bool reverse)
+unsigned long pattern_solid(float time, bool cycleStart, bool reverse)
 {
+  unsigned long power = 0;
+  for (int i = 0; i < ledCount; i++)
+  {
+    if (reverse)
+    {
+      leds[i] = colorBright(background[i], brightnessFloat);
+    }
+    else
+    {
+      leds[i] = colorBright(leds[i], brightnessFloat);
+    }
+    
+    power += colorPower(leds[i]);
+  }
+  return power;
+}
+
+unsigned long pattern_pulse(float time, bool cycleStart, bool reverse)
+{
+  unsigned long power = 0;
   for (int i = 0; i < ledCount; i++)
   {
     CRGB color = leds[i];
     CRGB bgColor = background[i];
+    float roundNumber = roundNumberForLed(i);
     if (reverse && i % 2 == 0)
     {
       if (time < 1)
       {
-        color = multColor<double>(color, bgColor, 1, 0, 1 - time);
+        color = multColor(color, bgColor, 1, 0, 1 - time, brightnessFloat, roundNumber);
       }
       else
       {
-        color = multColor<double>(color, bgColor, 1, 0, time - 1);
+        color = multColor(color, bgColor, 1, 0, time - 1, brightnessFloat, roundNumber);
       }
     }
     else
     {
       if (time < 1)
       {
-        color = multColor<double>(color, bgColor, 1, 0, time);
+        color = multColor(color, bgColor, 1, 0, time, brightnessFloat, roundNumber);
       }
       else
       {
-        color = multColor<double>(color, bgColor, 1, 0, 2 - time);
+        color = multColor(color, bgColor, 1, 0, 2 - time, brightnessFloat, roundNumber);
       }
     }
     leds[i] = color;
+    power += colorPower(leds[i]);
   }
+  return power;
 }
 
-void pattern_slide_base(double time, bool cycleStart, bool reverse, int slideLength, double transition)
+unsigned long pattern_slide_base(float time, bool cycleStart, bool reverse, int slideLength, float transition)
 {
-  double ledTime = 5.0 / ledCount;
-  double pos = time / ledTime;
+  unsigned long power = 0;
+  float ledTime = 5.0 / ledCount;
+  float pos = time / ledTime;
   for (int i = 0; i < ledCount; i++)
   {
     CRGB color = leds[i];
     CRGB bgColor = background[i];
-    
-    double dist = reverse ?
+    float roundNumber = roundNumberForLed(i);
+    float dist = reverse ?
       pos - (ledCount - i - 1) :
       pos - i;
     if (dist < 0)
@@ -425,39 +512,44 @@ void pattern_slide_base(double time, bool cycleStart, bool reverse, int slideLen
 
     if (ledCount - dist < transition)
     {
-      color = multColor<double>(color, bgColor, transition, 0, transition - (ledCount - dist));
+      color = multColor(color, bgColor, transition, 0, transition - (ledCount - dist));
     }
     else
     {
-      color = multColor<double>(color, bgColor, ledCount, ledCount - slideLength, ledCount - dist);
+      color = multColor(color, bgColor, ledCount, ledCount - slideLength, ledCount - dist);
     }
+
+    color = colorBright(color, brightnessFloat, roundNumber);
     
     leds[i] = color;
+    power += colorPower(color);
   }
+  return power;
 }
 
-void pattern_slide_long(double time, bool cycleStart, bool reverse)
+unsigned long pattern_slide_long(float time, bool cycleStart, bool reverse)
 {
-  pattern_slide_base(time, cycleStart, reverse, 40, 2.5);
+  return pattern_slide_base(time, cycleStart, reverse, 40, 2.5);
 }
 
-void pattern_slide_medium(double time, bool cycleStart, bool reverse)
+unsigned long pattern_slide_medium(float time, bool cycleStart, bool reverse)
 {
-  pattern_slide_base(time, cycleStart, reverse, 20, 2);
+  return pattern_slide_base(time, cycleStart, reverse, 20, 2);
 }
 
-void pattern_slide_short(double time, bool cycleStart, bool reverse)
+unsigned long pattern_slide_short(float time, bool cycleStart, bool reverse)
 {
-  pattern_slide_base(time, cycleStart, reverse, 10, 1);
+  return pattern_slide_base(time, cycleStart, reverse, 10, 1);
 }
 
-void pattern_scan(double time, bool cycleStart, bool reverse)
+unsigned long pattern_scan(float time, bool cycleStart, bool reverse)
 {
-  pattern_slide_base(time, cycleStart, reverse, ledCount / 2.0, ledCount / 2.0);
+  return pattern_slide_base(time, cycleStart, reverse, ledCount / 2.0, ledCount / 2.0);
 }
 
-void pattern_binary(double time, bool cycleStart, bool reverse)
+unsigned long pattern_binary(float time, bool cycleStart, bool reverse)
 {
+  unsigned long power = 0;
   static unsigned long long value = 0;
   if (cycleStart)
   {
@@ -470,8 +562,32 @@ void pattern_binary(double time, bool cycleStart, bool reverse)
   for (int i = 0; i < ledCount; i++)
   {
     if (shValue % 2 == 0)
-      leds[i] = background[i];
+      leds[i] = colorBright(background[i], brightnessFloat);
+    else
+      leds[i] = colorBright(leds[i], brightnessFloat);
     shValue = shValue >> 1;
+    
+    power += colorPower(leds[i]);
+  }
+  return power;
+}
+
+void shuffle(bool init = false)
+{
+  if (init)
+  {
+    for (int i = 0; i < ledCount; i++)
+    {
+      roundingOrder[i] = i;
+    }
+  }
+
+  for (int i = ledCount - 1; i >= 0; i--)
+  {
+    int index = random(0, i + 1);
+    int temp = roundingOrder[i];
+    roundingOrder[i] = roundingOrder[index];
+    roundingOrder[index] = temp;
   }
 }
 
@@ -553,10 +669,12 @@ void setup()
 
   strClear = F("                ");
   updateDisplay();
+
+  shuffle(true);
 }
 
 int lastButton = btnNONE;
-double curTime = 0;
+float curTime = 0;
 unsigned long lastTick = 0;
 unsigned long lastInfo = 0;
 unsigned int frameCount = 0;
@@ -565,13 +683,14 @@ void loop()
 {
   unsigned long curTick = micros();
   unsigned long diff = curTick - lastTick;
-  curTime += (double)diff * speed_factor(speed) / 1000000.0;
-  double timeLength = vals_pattern[curVal_pattern].time;
+  curTime += (float)diff * speed_factor(speed) / 1000000.0;
+  float timeLength = vals_pattern[curVal_pattern].time;
   bool cycleStart = curTime == 0;
   while (curTime > timeLength)
   {
     cycleStart = true;
     curTime -= timeLength;
+    shuffle();
   }
   lastTick = curTick;
   for (int i = 0; i < ledCount; i++)
@@ -581,20 +700,10 @@ void loop()
     leds[i] = color;
     background[i] = bgColor;
   }
-  vals_pattern[curVal_pattern].func(curTime, cycleStart, reverse);
+  unsigned long actualPwr = vals_pattern[curVal_pattern].func(curTime, cycleStart, reverse);
   
   unsigned long totalPwr = 765;
   totalPwr *= ledCount;
-  unsigned long actualPwr = 0;
-  for (int i = 0; i < ledCount; i++)
-  {
-    CRGB color = leds[i];
-    color = multColor<int>(color, CRGB::Black, 10, 0, brightness);
-    leds[i] = color;
-    actualPwr += leds[i].r;
-    actualPwr += leds[i].g;
-    actualPwr += leds[i].b;
-  }
   actualPwr *= 100;
   info_power = (int)(actualPwr / totalPwr);
 
@@ -603,7 +712,7 @@ void loop()
     actualPwr = 0;
     for (int i = 0; i < ledCount; i++)
     {
-      leds[i] = multColor<int>(leds[i], CRGB::Black, info_power, 0, power_cap);
+      leds[i] = multColor(leds[i], CRGB::Black, info_power, 0, power_cap);
       actualPwr += leds[i].r;
       actualPwr += leds[i].g;
       actualPwr += leds[i].b;
@@ -617,7 +726,7 @@ void loop()
   diff = curTick - lastInfo;
   if (diff > 1000000)
   {
-    info_fps = (int)(1000000 * (double)frameCount / (double)diff);
+    info_fps = (int)(1000000 * (float)frameCount / (float)diff);
     frameCount = 0;
     lastInfo = curTick;
     if (mode == modeINFO)
@@ -690,6 +799,7 @@ void loop()
         reverse = !reverse;
         break;
       }
+      brightnessFloat = (float)brightness / 10.0f;
       updateDisplay();
     }
     lastButton = curButton;
