@@ -598,13 +598,16 @@ void setup()
   randomSeed(analogRead(1));
   Serial.begin(9600);
 
-  numVals_color = 40;
+  numVals_color = 43;
   int i = 0;
   vals_color = new optColor[numVals_color];
   vals_color[i++].constant<255, 255, 255>(F("White"));
   vals_color[i++].constant<128, 128, 128>(F("Light Grey"));
   vals_color[i++].constant<48, 48, 48>(F("Dark Grey"));
   vals_color[i++].constant<0, 0, 0>(F("Black"));
+  vals_color[i++].constant<255, 145, 15>(F("Soft Yellow"));
+  vals_color[i++].constant<240, 100, 0>(F("Dark Soft Yellow"));
+  vals_color[i++].constant<255, 175, 30>(F("Light Sft Yellow"));
   vals_color[i++].constant<255, 0, 0>(F("Red"));
   vals_color[i++].constant<96, 0, 0>(F("Dark Red"));
   vals_color[i++].constant<255, 48, 48>(F("Pink"));
