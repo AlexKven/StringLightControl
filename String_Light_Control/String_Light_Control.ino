@@ -503,9 +503,11 @@ unsigned long pattern_solid(float time, bool cycleStart, bool reverse)
   return power;
 }
 
-unsigned long pattern_pulse(float time, bool cycleStart, bool reverse)
+unsigned long pattern_pulse_base(float time, bool cycleStart, bool reverse, int length)
 {
   unsigned long power = 0;
+  float transitionStart = length / 2.0;
+  
   for (int i = 0; i < ledCount; i++)
   {
     CRGB color = leds[i];
@@ -517,9 +519,17 @@ unsigned long pattern_pulse(float time, bool cycleStart, bool reverse)
       {
         color = multColor(color, bgColor, 1, 0, 1 - time, brightnessFloat, roundNumber);
       }
+      else if (time < transitionStart)
+      {
+        color = colorBright(bgColor, brightnessFloat);
+      }
+      else if (time < transitionStart + 1)
+      {
+        color = multColor(color, bgColor, 1, 0, time - transitionStart, brightnessFloat, roundNumber);
+      }
       else
       {
-        color = multColor(color, bgColor, 1, 0, time - 1, brightnessFloat, roundNumber);
+        color = colorBright(color, brightnessFloat);
       }
     }
     else
@@ -528,15 +538,33 @@ unsigned long pattern_pulse(float time, bool cycleStart, bool reverse)
       {
         color = multColor(color, bgColor, 1, 0, time, brightnessFloat, roundNumber);
       }
+      else if (time < transitionStart)
+      {
+        color = colorBright(color, brightnessFloat);
+      }
+      else if (time < transitionStart + 1)
+      {
+        color = multColor(color, bgColor, 1, 0, transitionStart + 1 - time, brightnessFloat, roundNumber);
+      }
       else
       {
-        color = multColor(color, bgColor, 1, 0, 2 - time, brightnessFloat, roundNumber);
+        color = colorBright(bgColor, brightnessFloat);
       }
     }
     leds[i] = color;
     power += colorPower(leds[i]);
   }
   return power;
+}
+
+unsigned long pattern_pulse(float time, bool cycleStart, bool reverse)
+{
+  return pattern_pulse_base(time, cycleStart, reverse, 2);
+}
+
+unsigned long pattern_long_pulse(float time, bool cycleStart, bool reverse)
+{
+  return pattern_pulse_base(time, cycleStart, reverse, 30);
 }
 
 unsigned long pattern_slide_base(float time, bool cycleStart, bool reverse, int slideLength, int slideCount, float transition, float tail)
@@ -852,7 +880,7 @@ void setup()
   vals_color[i++].set(color_ukraine, F("Ukraine"));
   vals_color[i++].set(color_random, F("Random"));
 
-  numVals_pattern = 14;
+  numVals_pattern = 15;
   i = 0;
   vals_pattern = new optPattern[numVals_pattern];
   vals_pattern[i].name = F("Solid");
@@ -861,6 +889,9 @@ void setup()
   vals_pattern[i].name = F("Pulse");
   vals_pattern[i].func = pattern_pulse;
   vals_pattern[i++].time = 2;
+  vals_pattern[i].name = F("Long Pulse");
+  vals_pattern[i].func = pattern_long_pulse;
+  vals_pattern[i++].time = 30;
   vals_pattern[i].name = F("Slide Long");
   vals_pattern[i].func = pattern_slide_long;
   vals_pattern[i++].time = 5;
