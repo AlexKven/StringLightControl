@@ -444,6 +444,17 @@ CRGB color_christmas(int led)
   return led % 2 == 0 ? CRGB(48, 255, 0) : CRGB(255, 0, 0);
 }
 
+CRGB color_usa(int led)
+{
+  return led % 3 == 0 ? CRGB(255, 0, 0) : led % 3 == 1 ? CRGB(255, 255, 255) : CRGB(0, 0, 255);
+}
+
+
+CRGB color_ukraine(int led)
+{
+  return led % 2 == 0 ? CRGB(0, 0, 255) : CRGB(255, 255, 0);
+}
+
 CRGB color_police(int led)
 {
   return (led / 4) % 2 == 0 ? CRGB(255, 0, 0) : CRGB(0, 0, 255);
@@ -528,13 +539,14 @@ unsigned long pattern_pulse(float time, bool cycleStart, bool reverse)
   return power;
 }
 
-unsigned long pattern_slide_base(float time, bool cycleStart, bool reverse, int slideLength, int slideCount, float transition)
+unsigned long pattern_slide_base(float time, bool cycleStart, bool reverse, int slideLength, int slideCount, float transition, float tail)
 {
   unsigned long power = 0;
   float sectionLength = (float)ledCount / (float)slideCount;
-  float ledTime = slideCount * 5.0 / sectionLength;
-  float pos = (time * slideCount) / ledTime;
-  Serial.println(pos);
+  float ledTime = 5.0 / ledCount; 
+  float pos = time / (ledTime * slideCount);
+  while (pos > sectionLength)
+    pos -= sectionLength;
   for (int i = 0; i < ledCount; i++)
   {
     float sI = i;
@@ -558,7 +570,7 @@ unsigned long pattern_slide_base(float time, bool cycleStart, bool reverse, int 
     }
     else
     {
-      color = multColor(color, bgColor, sectionLength, sectionLength - slideLength, sectionLength - dist);
+      color = multColor(color, bgColor, sectionLength - (slideLength - tail), sectionLength - slideLength, sectionLength - dist);
     }
 
     color = colorBright(color, brightnessFloat, roundNumber);
@@ -571,22 +583,57 @@ unsigned long pattern_slide_base(float time, bool cycleStart, bool reverse, int 
 
 unsigned long pattern_slide_long(float time, bool cycleStart, bool reverse)
 {
-  return pattern_slide_base(time, cycleStart, reverse, 40, 1, 2.5);
+  return pattern_slide_base(time, cycleStart, reverse, 40, 1, 2.5, 40);
 }
 
 unsigned long pattern_slide_medium(float time, bool cycleStart, bool reverse)
 {
-  return pattern_slide_base(time, cycleStart, reverse, 20, 1, 2);
+  return pattern_slide_base(time, cycleStart, reverse, 20, 1, 2, 20);
 }
 
 unsigned long pattern_slide_short(float time, bool cycleStart, bool reverse)
 {
-  return pattern_slide_base(time, cycleStart, reverse, 10, 1, 1);
+  return pattern_slide_base(time, cycleStart, reverse, 10, 1, 1, 10);
 }
 
 unsigned long pattern_scan(float time, bool cycleStart, bool reverse)
 {
-  return pattern_slide_base(time, cycleStart, reverse, ledCount / 2.0, 1, ledCount / 2.0);
+  return pattern_slide_base(time, cycleStart, reverse, ledCount / 2.0, 1, ledCount / 2.0, ledCount / 2.0);
+}
+
+unsigned long pattern_scan2(float time, bool cycleStart, bool reverse)
+{
+  return pattern_slide_base(time, cycleStart, reverse, ledCount / 4.0, 2, ledCount / 4.0, ledCount / 4.0);
+}
+
+unsigned long pattern_scan4(float time, bool cycleStart, bool reverse)
+{
+  return pattern_slide_base(time, cycleStart, reverse, ledCount / 8.0, 4, ledCount / 8.0, ledCount / 8.0);
+}
+
+unsigned long pattern_stripes2(float time, bool cycleStart, bool reverse)
+{
+  return pattern_slide_base(time, cycleStart, reverse, ledCount / 2.0, 1, 1, 1);
+}
+
+unsigned long pattern_stripes4(float time, bool cycleStart, bool reverse)
+{
+  return pattern_slide_base(time, cycleStart, reverse, ledCount / 4.0, 2, 1, 1);
+}
+
+unsigned long pattern_stripes8(float time, bool cycleStart, bool reverse)
+{
+  return pattern_slide_base(time, cycleStart, reverse, ledCount / 8.0, 4, 1, 1);
+}
+
+unsigned long pattern_stripes16(float time, bool cycleStart, bool reverse)
+{
+  return pattern_slide_base(time, cycleStart, reverse, ledCount / 16.0, 8, 1, 1);
+}
+
+unsigned long pattern_stripesMini(float time, bool cycleStart, bool reverse)
+{
+  return pattern_slide_base(time, cycleStart, reverse, 2, ledCount / 4, 1, 1);
 }
 
 unsigned long pattern_binary(float time, bool cycleStart, bool reverse)
@@ -755,7 +802,7 @@ void setup()
   randomSeed(analogRead(1));
   Serial.begin(9600);
 
-  numVals_color = 44;
+  numVals_color = 46;
   int i = 0;
   vals_color = new optColor[numVals_color];
   vals_color[i++].constant<255, 255, 255>(F("White"));
@@ -801,9 +848,11 @@ void setup()
   vals_color[i++].set(color_seahawks, F("Seahawks"));
   vals_color[i++].set(color_christmas, F("Christmas"));
   vals_color[i++].set(color_police, F("Police"));
+  vals_color[i++].set(color_usa, F("USA"));
+  vals_color[i++].set(color_ukraine, F("Ukraine"));
   vals_color[i++].set(color_random, F("Random"));
 
-  numVals_pattern = 7;
+  numVals_pattern = 14;
   i = 0;
   vals_pattern = new optPattern[numVals_pattern];
   vals_pattern[i].name = F("Solid");
@@ -823,6 +872,27 @@ void setup()
   vals_pattern[i++].time = 5;
   vals_pattern[i].name = F("Scan");
   vals_pattern[i].func = pattern_scan;
+  vals_pattern[i++].time = 5;
+  vals_pattern[i].name = F("Scan 2");
+  vals_pattern[i].func = pattern_scan2;
+  vals_pattern[i++].time = 5;
+  vals_pattern[i].name = F("Scan 4");
+  vals_pattern[i].func = pattern_scan4;
+  vals_pattern[i++].time = 5;
+  vals_pattern[i].name = F("2 Stripes");
+  vals_pattern[i].func = pattern_stripes2;
+  vals_pattern[i++].time = 5;
+  vals_pattern[i].name = F("4 Stripes");
+  vals_pattern[i].func = pattern_stripes4;
+  vals_pattern[i++].time = 5;
+  vals_pattern[i].name = F("8 Stripes");
+  vals_pattern[i].func = pattern_stripes8;
+  vals_pattern[i++].time = 5;
+  vals_pattern[i].name = F("16 Stripes");
+  vals_pattern[i].func = pattern_stripes16;
+  vals_pattern[i++].time = 5;
+  vals_pattern[i].name = F("Mini Stripes");
+  vals_pattern[i].func = pattern_stripesMini;
   vals_pattern[i++].time = 5;
   vals_pattern[i].name = F("Binary");
   vals_pattern[i].func = pattern_binary;
