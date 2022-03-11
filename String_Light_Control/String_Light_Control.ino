@@ -146,7 +146,7 @@ int colorPower(CRGB color)
   return color.r + color.g + color.b;
 }
 
-int power_cap = 100;
+int power_cap = 70;
 
 int brightness = 5;
 float brightnessFloat = 0.5f;
@@ -528,29 +528,37 @@ unsigned long pattern_pulse(float time, bool cycleStart, bool reverse)
   return power;
 }
 
-unsigned long pattern_slide_base(float time, bool cycleStart, bool reverse, int slideLength, float transition)
+unsigned long pattern_slide_base(float time, bool cycleStart, bool reverse, int slideLength, int slideCount, float transition)
 {
   unsigned long power = 0;
-  float ledTime = 5.0 / ledCount;
-  float pos = time / ledTime;
+  float sectionLength = (float)ledCount / (float)slideCount;
+  float ledTime = slideCount * 5.0 / sectionLength;
+  float pos = (time * slideCount) / ledTime;
+  Serial.println(pos);
   for (int i = 0; i < ledCount; i++)
   {
+    float sI = i;
+    while (sI >= sectionLength)
+      sI -= sectionLength;
     CRGB color = leds[i];
     CRGB bgColor = background[i];
     float roundNumber = roundNumberForLed(i);
     float dist = reverse ?
-      pos - (ledCount - i - 1) :
-      pos - i;
+      pos - (sectionLength - sI - 1) :
+      pos - sI;
     if (dist < 0)
-      dist += ledCount;
+      dist += sectionLength;
+//
+//    while (dist >= sectionLength)
+//      dist -= sectionLength;
 
-    if (ledCount - dist < transition)
+    if (sectionLength - dist < transition)
     {
-      color = multColor(color, bgColor, transition, 0, transition - (ledCount - dist));
+      color = multColor(color, bgColor, transition, 0, transition - (sectionLength - dist));
     }
     else
     {
-      color = multColor(color, bgColor, ledCount, ledCount - slideLength, ledCount - dist);
+      color = multColor(color, bgColor, sectionLength, sectionLength - slideLength, sectionLength - dist);
     }
 
     color = colorBright(color, brightnessFloat, roundNumber);
@@ -563,22 +571,22 @@ unsigned long pattern_slide_base(float time, bool cycleStart, bool reverse, int 
 
 unsigned long pattern_slide_long(float time, bool cycleStart, bool reverse)
 {
-  return pattern_slide_base(time, cycleStart, reverse, 40, 2.5);
+  return pattern_slide_base(time, cycleStart, reverse, 40, 1, 2.5);
 }
 
 unsigned long pattern_slide_medium(float time, bool cycleStart, bool reverse)
 {
-  return pattern_slide_base(time, cycleStart, reverse, 20, 2);
+  return pattern_slide_base(time, cycleStart, reverse, 20, 1, 2);
 }
 
 unsigned long pattern_slide_short(float time, bool cycleStart, bool reverse)
 {
-  return pattern_slide_base(time, cycleStart, reverse, 10, 1);
+  return pattern_slide_base(time, cycleStart, reverse, 10, 1, 1);
 }
 
 unsigned long pattern_scan(float time, bool cycleStart, bool reverse)
 {
-  return pattern_slide_base(time, cycleStart, reverse, ledCount / 2.0, ledCount / 2.0);
+  return pattern_slide_base(time, cycleStart, reverse, ledCount / 2.0, 1, ledCount / 2.0);
 }
 
 unsigned long pattern_binary(float time, bool cycleStart, bool reverse)
