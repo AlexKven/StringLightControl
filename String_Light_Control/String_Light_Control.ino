@@ -52,7 +52,7 @@ int read_LCD_buttons()
  return btnNONE;  // when all others fail, return this...
 }
 
-float mult(float maxVal, float minVal, float maxLevel, float minLevel, float level)
+float mult(float maxVal, float minVal, float maxLevel, float minLevel, float level, bool sine)
 {
   if (level <= minLevel)
     return minVal;
@@ -61,6 +61,10 @@ float mult(float maxVal, float minVal, float maxLevel, float minLevel, float lev
   float valVariance = maxVal - minVal;
   float levelVariance = maxLevel - minLevel;
   float frac = (level - minLevel) / levelVariance;
+  if (sine)
+  {
+    frac = 0.5 * (float)(1 - cos(PI * frac));
+  }
   float result = minVal + frac * valVariance;
   
   return result;
@@ -75,16 +79,16 @@ float roundByNumber(float number, float roundNumber)
   return rounded;
 }
 
-CRGB multColor(CRGB to, CRGB from, float maxLevel, float minLevel, float level, float bright = 1.0f, float roundNumber = 1.0f)
+CRGB multColor(CRGB to, CRGB from, float maxLevel, float minLevel, float level, float bright = 1.0f, float roundNumber = 1.0f, bool sine = false)
 {
   if (level <= minLevel)
     return from;
   if (level >= maxLevel)
     return to;
 
-  float rFloat = mult(to.r, from.r, maxLevel, minLevel, level) * bright;
-  float gFloat = mult(to.g, from.g, maxLevel, minLevel, level) * bright;
-  float bFloat = mult(to.b, from.b, maxLevel, minLevel, level) * bright;
+  float rFloat = mult(to.r, from.r, maxLevel, minLevel, level, sine) * bright;
+  float gFloat = mult(to.g, from.g, maxLevel, minLevel, level, sine) * bright;
+  float bFloat = mult(to.b, from.b, maxLevel, minLevel, level, sine) * bright;
 
   if (roundNumber < 1.0)
   {
@@ -503,7 +507,7 @@ unsigned long pattern_solid(float time, bool cycleStart, bool reverse)
   return power;
 }
 
-unsigned long pattern_pulse_base(float time, bool cycleStart, bool reverse, int length)
+unsigned long pattern_pulse_base(float time, bool cycleStart, bool reverse, int length, bool sine)
 {
   unsigned long power = 0;
   float transitionStart = length / 2.0;
@@ -517,7 +521,7 @@ unsigned long pattern_pulse_base(float time, bool cycleStart, bool reverse, int 
     {
       if (time < 1)
       {
-        color = multColor(color, bgColor, 1, 0, 1 - time, brightnessFloat, roundNumber);
+        color = multColor(color, bgColor, 1, 0, 1 - time, brightnessFloat, roundNumber, sine);
       }
       else if (time < transitionStart)
       {
@@ -525,7 +529,7 @@ unsigned long pattern_pulse_base(float time, bool cycleStart, bool reverse, int 
       }
       else if (time < transitionStart + 1)
       {
-        color = multColor(color, bgColor, 1, 0, time - transitionStart, brightnessFloat, roundNumber);
+        color = multColor(color, bgColor, 1, 0, time - transitionStart, brightnessFloat, roundNumber, sine);
       }
       else
       {
@@ -536,7 +540,7 @@ unsigned long pattern_pulse_base(float time, bool cycleStart, bool reverse, int 
     {
       if (time < 1)
       {
-        color = multColor(color, bgColor, 1, 0, time, brightnessFloat, roundNumber);
+        color = multColor(color, bgColor, 1, 0, time, brightnessFloat, roundNumber, sine);
       }
       else if (time < transitionStart)
       {
@@ -544,7 +548,7 @@ unsigned long pattern_pulse_base(float time, bool cycleStart, bool reverse, int 
       }
       else if (time < transitionStart + 1)
       {
-        color = multColor(color, bgColor, 1, 0, transitionStart + 1 - time, brightnessFloat, roundNumber);
+        color = multColor(color, bgColor, 1, 0, transitionStart + 1 - time, brightnessFloat, roundNumber, sine);
       }
       else
       {
@@ -559,15 +563,15 @@ unsigned long pattern_pulse_base(float time, bool cycleStart, bool reverse, int 
 
 unsigned long pattern_pulse(float time, bool cycleStart, bool reverse)
 {
-  return pattern_pulse_base(time, cycleStart, reverse, 2);
+  return pattern_pulse_base(time, cycleStart, reverse, 2, false);
 }
 
 unsigned long pattern_long_pulse(float time, bool cycleStart, bool reverse)
 {
-  return pattern_pulse_base(time, cycleStart, reverse, 30);
+  return pattern_pulse_base(time, cycleStart, reverse, 30, false);
 }
 
-unsigned long pattern_slide_base(float time, bool cycleStart, bool reverse, int slideLength, int slideCount, float transition, float tail)
+unsigned long pattern_slide_base(float time, bool cycleStart, bool reverse, int slideLength, int slideCount, float transition, float tail, bool sine = false)
 {
   unsigned long power = 0;
   float sectionLength = (float)ledCount / (float)slideCount;
@@ -594,11 +598,11 @@ unsigned long pattern_slide_base(float time, bool cycleStart, bool reverse, int 
 
     if (sectionLength - dist < transition)
     {
-      color = multColor(color, bgColor, transition, 0, transition - (sectionLength - dist));
+      color = multColor(color, bgColor, transition, 0, transition - (sectionLength - dist), 1.0, sine);
     }
     else
     {
-      color = multColor(color, bgColor, sectionLength - (slideLength - tail), sectionLength - slideLength, sectionLength - dist);
+      color = multColor(color, bgColor, sectionLength - (slideLength - tail), sectionLength - slideLength, sectionLength - dist, 1.0, sine);
     }
 
     color = colorBright(color, brightnessFloat, roundNumber);
@@ -611,57 +615,57 @@ unsigned long pattern_slide_base(float time, bool cycleStart, bool reverse, int 
 
 unsigned long pattern_slide_long(float time, bool cycleStart, bool reverse)
 {
-  return pattern_slide_base(time, cycleStart, reverse, 40, 1, 2.5, 40);
+  return pattern_slide_base(time, cycleStart, reverse, 40, 1, 2.5, 40, false);
 }
 
 unsigned long pattern_slide_medium(float time, bool cycleStart, bool reverse)
 {
-  return pattern_slide_base(time, cycleStart, reverse, 20, 1, 2, 20);
+  return pattern_slide_base(time, cycleStart, reverse, 20, 1, 2, 20, false);
 }
 
 unsigned long pattern_slide_short(float time, bool cycleStart, bool reverse)
 {
-  return pattern_slide_base(time, cycleStart, reverse, 10, 1, 1, 10);
+  return pattern_slide_base(time, cycleStart, reverse, 10, 1, 1, 10, false);
 }
 
 unsigned long pattern_scan(float time, bool cycleStart, bool reverse)
 {
-  return pattern_slide_base(time, cycleStart, reverse, ledCount / 2.0, 1, ledCount / 2.0, ledCount / 2.0);
+  return pattern_slide_base(time, cycleStart, reverse, ledCount / 2.0, 1, ledCount / 2.0, ledCount / 2.0, true);
 }
 
 unsigned long pattern_scan2(float time, bool cycleStart, bool reverse)
 {
-  return pattern_slide_base(time, cycleStart, reverse, ledCount / 4.0, 2, ledCount / 4.0, ledCount / 4.0);
+  return pattern_slide_base(time, cycleStart, reverse, ledCount / 4.0, 2, ledCount / 4.0, ledCount / 4.0, true);
 }
 
 unsigned long pattern_scan4(float time, bool cycleStart, bool reverse)
 {
-  return pattern_slide_base(time, cycleStart, reverse, ledCount / 8.0, 4, ledCount / 8.0, ledCount / 8.0);
+  return pattern_slide_base(time, cycleStart, reverse, ledCount / 8.0, 4, ledCount / 8.0, ledCount / 8.0, true);
 }
 
 unsigned long pattern_stripes2(float time, bool cycleStart, bool reverse)
 {
-  return pattern_slide_base(time, cycleStart, reverse, ledCount / 2.0, 1, 1, 1);
+  return pattern_slide_base(time, cycleStart, reverse, ledCount / 2.0, 1, 1, 1, false);
 }
 
 unsigned long pattern_stripes4(float time, bool cycleStart, bool reverse)
 {
-  return pattern_slide_base(time, cycleStart, reverse, ledCount / 4.0, 2, 1, 1);
+  return pattern_slide_base(time, cycleStart, reverse, ledCount / 4.0, 2, 1, 1, false);
 }
 
 unsigned long pattern_stripes8(float time, bool cycleStart, bool reverse)
 {
-  return pattern_slide_base(time, cycleStart, reverse, ledCount / 8.0, 4, 1, 1);
+  return pattern_slide_base(time, cycleStart, reverse, ledCount / 8.0, 4, 1, 1, false);
 }
 
 unsigned long pattern_stripes16(float time, bool cycleStart, bool reverse)
 {
-  return pattern_slide_base(time, cycleStart, reverse, ledCount / 16.0, 8, 1, 1);
+  return pattern_slide_base(time, cycleStart, reverse, ledCount / 16.0, 8, 1, 1, false);
 }
 
 unsigned long pattern_stripesMini(float time, bool cycleStart, bool reverse)
 {
-  return pattern_slide_base(time, cycleStart, reverse, 2, ledCount / 4, 1, 1);
+  return pattern_slide_base(time, cycleStart, reverse, 2, ledCount / 4, 1, 1, false);
 }
 
 unsigned long pattern_binary(float time, bool cycleStart, bool reverse)
