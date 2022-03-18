@@ -31,7 +31,7 @@ size_t strlen(STR ifsh)
   return n;
 }
 
-#define ledCount 100
+#define ledCount 50
 float ledCountFloat = (float)ledCount;
 CRGB leds[ledCount];
 CRGB background[ledCount];
@@ -150,10 +150,14 @@ int colorPower(CRGB color)
   return color.r + color.g + color.b;
 }
 
-int power_cap = 70;
+int power_cap = 40;
 
 int brightness = 5;
 float brightnessFloat = 0.5f;
+
+bool interacted = false;
+byte brightnessToRestore = 0;
+unsigned long brightnessLastRestored = 0;
 
 int speed = 0;
 int min_speed = -12;
@@ -802,12 +806,17 @@ void initEeprom()
   eeprom_length = EEPROM.length();
   loadSettings();
 
+  brightnessToRestore = brightness;
   if (brightness < 2)
     brightness = 0;
   else
     brightness -= 2;
   brightnessFloat = (float)brightness / 10.0f;
-    
+  saveBrightness();
+}
+
+void saveBrightness()
+{
   writeResilient(curVal_preset * 6 + 1, brightness);
 }
 
@@ -957,6 +966,16 @@ void loop()
   curTime += (float)diff * speed_factor(speed) / 1000000.0;
   float timeLength = vals_pattern[curVal_pattern].time;
   bool cycleStart = curTime == 0;
+  if (curTick - brightnessLastRestored > 20000000 &&
+      brightness < brightnessToRestore &&
+      !interacted)
+  {
+    brightnessLastRestored = curTick;
+    brightness++;
+    brightnessFloat = (float)brightness / 10.0f;
+    saveBrightness();
+    updateDisplay();
+  }
   while (curTime > timeLength)
   {
     cycleStart = true;
@@ -1118,6 +1137,7 @@ void loop()
     else
     {
       holdStart = 0;
+      interacted = true;
     }
     lastButton = curButton;
   }
