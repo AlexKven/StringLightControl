@@ -150,7 +150,7 @@ int colorPower(CRGB color)
   return color.r + color.g + color.b;
 }
 
-int power_cap = 40;
+int power_cap = 100;
 
 int brightness = 5;
 float brightnessFloat = 0.5f;
