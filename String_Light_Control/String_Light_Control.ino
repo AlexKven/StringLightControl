@@ -31,7 +31,7 @@ size_t strlen(STR ifsh)
   return n;
 }
 
-#define ledCount 50
+#define ledCount 100
 float ledCountFloat = (float)ledCount;
 CRGB leds[ledCount];
 CRGB background[ledCount];
@@ -447,6 +447,19 @@ CRGB color_seahawks(int led)
   return led % 2 == 0 ? CRGB(128, 255, 0) : CRGB(0, 64, 255);
 }
 
+CRGB color_mariners(int led)
+{
+  switch (led % 3)
+  {
+    case 0:
+      return CRGB(12, 64, 128);
+    case 1:
+      return CRGB(236, 248, 255);
+    case 2:
+      return CRGB(0, 128, 96);
+  }
+}
+
 CRGB color_christmas(int led)
 {
   return led % 2 == 0 ? CRGB(48, 255, 0) : CRGB(255, 0, 0);
@@ -457,10 +470,14 @@ CRGB color_usa(int led)
   return led % 3 == 0 ? CRGB(255, 0, 0) : led % 3 == 1 ? CRGB(255, 255, 255) : CRGB(0, 0, 255);
 }
 
-
 CRGB color_ukraine(int led)
 {
   return led % 2 == 0 ? CRGB(0, 0, 255) : CRGB(255, 255, 0);
+}
+
+CRGB color_israel(int led)
+{
+  return (led / 3) % 2 == 0 ? CRGB(0, 100, 184) : CRGB(255, 255, 255);
 }
 
 CRGB color_police(int led)
@@ -843,7 +860,7 @@ void setup()
   randomSeed(analogRead(1));
   Serial.begin(9600);
 
-  numVals_color = 46;
+  numVals_color = 48;
   int i = 0;
   vals_color = new optColor[numVals_color];
   vals_color[i++].constant<255, 255, 255>(F("White"));
@@ -892,6 +909,8 @@ void setup()
   vals_color[i++].set(color_usa, F("USA"));
   vals_color[i++].set(color_ukraine, F("Ukraine"));
   vals_color[i++].set(color_random, F("Random"));
+  vals_color[i++].set(color_mariners, F("Mariners"));
+  vals_color[i++].set(color_israel, F("Israel"));
 
   numVals_pattern = 15;
   i = 0;
